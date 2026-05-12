@@ -1,0 +1,27 @@
+name: C++ Linting and Formatting
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  cpp-linter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run C++ Linter
+        uses: cpp-linter/cpp-linter-action@v2
+        id: linter
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          style: 'file'       # Uses your .clang-format file
+          tidy-checks: '*'    # Uses your .clang-tidy file
+          thread-comments: ${{ github.event_name == 'pull_request' && 'update' }} # Adds feedback directly to PRs
+
+      - name: Fail if checks failed
+        if: steps.linter.outputs.checks-failed > 0
+        run: exit 1
