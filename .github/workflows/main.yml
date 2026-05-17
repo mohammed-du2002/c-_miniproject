@@ -1,4 +1,4 @@
-name: C++ Linting and Formatting
+name: C++ CI
 
 on:
   push:
@@ -7,21 +7,78 @@ on:
     branches: [ main, develop ]
 
 jobs:
-  cpp-linter:
+  format:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Run C++ Linter
-        uses: cpp-linter/cpp-linter-action@v2
-        id: linter
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          style: 'file'       # Uses your .clang-format file
-          tidy-checks: '*'    # Uses your .clang-tidy file
-          thread-comments: ${{ github.event_name == 'pull_request' && 'update' }} # Adds feedback directly to PRs
+          persist-credentials: true
 
-      - name: Fail if checks failed
-        if: steps.linter.outputs.checks-failed > 0
-        run: exit 1
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format cppcheck
+
+      - name: Apply clang-format and push
+        run: |
+          files=$(git ls-files '*.cpp' '*.h' || true)
+          if [ -n "$files" ]; then
+            clang-format -style=file -i $files
+            if ! git diff --quiet; then
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git add $files
+              git commit -m "chore: apply clang-format"
+              git push
+            fi
+          fi
+
+      - name: Run cppcheck
+        run: cppcheck --enable=all --inconclusive --error-exitcode=1 .
+
+  lint_and_build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build_type: [Release, Debug]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format clang-tidy cppcheck cmake build-essential
+
+      - name: Check formatting (fail on diff)
+        run: |
+          files=$(git ls-files '*.cpp' '*.h' || true)
+          if [ -n "$files" ]; then
+            for f in $files; do
+              clang-format -style=file "$f" | diff -u "$f" - || (echo "Formatting issues in $f"; exit 1)
+            done
+          fi
+
+      - name: Run cppcheck
+        run: cppcheck --enable=all --inconclusive --error-exitcode=1 .
+
+      - name: Configure CMake
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Run clang-tidy
+        run: |
+          files=$(git ls-files '*.cpp' || true)
+          if [ -n "$files" ]; then
+            clang-tidy -p build $files
+          fi
+
+      - name: Build
+        run: cmake --build build -- -j
+
+      - name: Run tests
+        run: |
+          if [ -f build/CTestTestfile.cmake ]; then
+            cmake --build build --target test
+          else
+            echo "No tests found"
+          fi
