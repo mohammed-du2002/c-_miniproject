@@ -6,6 +6,7 @@
 #include "../dao/EmployeeDAOSQLite.h"
 #include "../dao/DepartmentDAOSQLite.h"
 #include <iostream>
+#include <iomanip>
 
 void ConsoleUI::run() {
   initializeDatabase();
@@ -58,7 +59,7 @@ void ConsoleUI::hrMenu(AuthService& authSvc, EmployeeService& empSvc, Department
 
     switch (choice) {
       case 1:
-        manageDepartments(deptSvc);
+        manageDepartments(empSvc, deptSvc);
         break;
       case 2:
         manageEmployees(authSvc, empSvc, deptSvc);
@@ -243,15 +244,16 @@ void ConsoleUI::createDefaultHR() {
 }
 
 /*Manage Departments*/
-void ConsoleUI::manageDepartments(DepartmentService& deptSvc) {
+void ConsoleUI::manageDepartments(EmployeeService& empSvc, DepartmentService& deptSvc) {
   int choice;
   do {
     std::cout << "\n--- Manage Departments ---\n";
     std::cout << "1. List Departments\n";
-    std::cout << "2. Add Department\n";
-    std::cout << "3. Edit Department\n";
-    std::cout << "4. Delete Department\n";
-    std::cout << "5. Back\n";
+    std::cout << "2. View Employees in Department\n";
+    std::cout << "3. Add Department\n";
+    std::cout << "4. Edit Department\n";
+    std::cout << "5. Delete Department\n";
+    std::cout << "6. Back\n";
     std::cout << "Enter choice: ";
     std::cin >> choice;
 
@@ -260,15 +262,18 @@ void ConsoleUI::manageDepartments(DepartmentService& deptSvc) {
         listDepartments(deptSvc);
         break;
       case 2:
-        addDepartment(deptSvc);
+        viewEmployeesByDepartment(empSvc, deptSvc);
         break;
       case 3:
-        editDepartment(deptSvc);
+        addDepartment(deptSvc);
         break;
       case 4:
-        deleteDepartment(deptSvc);
+        editDepartment(deptSvc);
         break;
       case 5:
+        deleteDepartment(deptSvc);
+        break;
+      case 6:
         return;
       default:
         std::cout << "Invalid choice.\n";
@@ -288,6 +293,32 @@ void ConsoleUI::listDepartments(DepartmentService& deptSvc) {
   for (const auto& d : depts) {
     std::cout << std::setw(5) << d.id << std::setw(20) << d.name << std::setw(30) << d.description
               << "\n";
+  }
+}
+
+void ConsoleUI::viewEmployeesByDepartment(EmployeeService& empSvc, DepartmentService& deptSvc) {
+  int deptId;
+  std::cout << "Enter Department ID: ";
+  std::cin >> deptId;
+
+  Department dept = deptSvc.getDepartment(deptId);
+  if (dept.id == -1) {
+    std::cout << "Department not found.\n";
+    return;
+  }
+
+  auto employees = empSvc.getEmployeesByDepartment(deptId);
+  if (employees.empty()) {
+    std::cout << "No employees found in department '" << dept.name << "'.\n";
+    return;
+  }
+
+  std::cout << "\nEmployees in department '" << dept.name << "':\n";
+  std::cout << std::setw(5) << "ID" << std::setw(20) << "Name" << std::setw(10) << "Salary" << "\n";
+  std::cout << std::string(40, '-') << "\n";
+  for (const auto& emp : employees) {
+    std::cout << std::setw(5) << emp.id << std::setw(20) << emp.getFullName() << std::setw(10)
+              << emp.salary << "\n";
   }
 }
 

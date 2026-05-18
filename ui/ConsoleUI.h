@@ -27,8 +27,9 @@ class ConsoleUI {
   void deleteEmployee(EmployeeService& empSvc);
 
   /* Department Management */
-  void manageDepartments(DepartmentService& deptSvc);
+  void manageDepartments(EmployeeService& empSvc, DepartmentService& deptSvc);
   void listDepartments(DepartmentService& deptSvc);
+  void viewEmployeesByDepartment(EmployeeService& empSvc, DepartmentService& deptSvc);
   void addDepartment(DepartmentService& deptSvc);
   void editDepartment(DepartmentService& deptSvc);
   void deleteDepartment(DepartmentService& deptSvc);
