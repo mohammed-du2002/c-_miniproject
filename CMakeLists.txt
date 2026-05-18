@@ -13,8 +13,15 @@ find_package(SQLiteCpp REQUIRED)
 
 # Create executable
 add_executable(
-  hr_system main.cpp ui/ConsoleUI.cpp service/DepartmentService.cpp
-            dao/DepartmentDAOSQLite.cpp)
+  hr_system
+  main.cpp
+  ui/ConsoleUI.cpp
+  dao/DepartmentDAOSQLite.cpp
+  dao/UserDAOSQLite.cpp
+  dao/EmployeeDAOSQLite.cpp
+  service/AuthService.cpp
+  service/DepartmentService.cpp
+  service/EmployeeService.cpp)
 
 # Project include directories
 target_include_directories(

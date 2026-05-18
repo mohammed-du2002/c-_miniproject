@@ -4,23 +4,34 @@
 #include <memory>
 #include <string>
 
+#include "service/AuthService.h"
 class DepartmentService;
+class EmployeeService;
 
-class ConsoleUI
-{
-public:
-    void run();
+class ConsoleUI {
+ public:
+  void run();
 
-private:
-    void hrMenu(DepartmentService &deptSvc);
-    void initializeDatabase();
+ private:
+  void initializeDatabase();
+  void createDefaultHR();
+  AuthService::LoginResult promptLogin();
 
-    /* Department Management */
-    void manageDepartments(DepartmentService &deptSvc);
-    void listDepartments(DepartmentService &deptSvc);
-    void addDepartment(DepartmentService &deptSvc);
-    void editDepartment(DepartmentService &deptSvc);
-    void deleteDepartment(DepartmentService &deptSvc);
+  void hrMenu(AuthService& authSvc, EmployeeService& empSvc, DepartmentService& deptSvc);
+
+  /*Employee Management */
+  void manageEmployees(AuthService& auth, EmployeeService& empSvc, DepartmentService& deptSvc);
+  void listEmployees(EmployeeService& empSvc, DepartmentService& deptSvc);
+  void addEmployee(AuthService& auth, EmployeeService& empSvc, DepartmentService& deptSvc);
+  void editEmployee(EmployeeService& empSvc, DepartmentService& deptSvc);
+  void deleteEmployee(EmployeeService& empSvc);
+
+  /* Department Management */
+  void manageDepartments(DepartmentService& deptSvc);
+  void listDepartments(DepartmentService& deptSvc);
+  void addDepartment(DepartmentService& deptSvc);
+  void editDepartment(DepartmentService& deptSvc);
+  void deleteDepartment(DepartmentService& deptSvc);
 };
 
 #endif
