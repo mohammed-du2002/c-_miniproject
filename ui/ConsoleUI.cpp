@@ -2,11 +2,15 @@
 #include "../service/DepartmentService.h"
 #include "../service/AuthService.h"
 #include "../service/EmployeeService.h"
+#include "../service/AttendanceService.h"
 #include "../dao/UserDAOSQLite.h"
 #include "../dao/EmployeeDAOSQLite.h"
 #include "../dao/DepartmentDAOSQLite.h"
+#include "../dao/AttendanceDAOSQLite.h"
 #include <iostream>
 #include <iomanip>
+#include <ctime>
+#include <sstream>
 
 void ConsoleUI::run() {
   initializeDatabase();
@@ -15,10 +19,13 @@ void ConsoleUI::run() {
   auto userDAO = std::make_shared<UserDAOSQLite>("hr.db");
   auto empDAO = std::make_shared<EmployeeDAOSQLite>("hr.db");
   auto deptDAO = std::make_shared<DepartmentDAOSQLite>("hr.db");
+  auto attDAO = std::make_shared<AttendanceDAOSQLite>("hr.db");
 
   AuthService authService(userDAO, empDAO);
   EmployeeService empService(empDAO, deptDAO);
   DepartmentService deptService(deptDAO);
+  AttendanceService attService(attDAO, empDAO);
+
   while (true) {
     auto result = promptLogin();
     if (!result.success) {
@@ -29,8 +36,9 @@ void ConsoleUI::run() {
     std::cout << "\nWelcome! Logged in as " << result.role << ".\n";
 
     if (result.role == "HR") {
-      hrMenu(authService, empService, deptService);
+      hrMenu(authService, empService, deptService, attService);
     } else {
+      employeeMenu(authService, attService, result);
     }
 
     std::cout << "Logged out successfully.\n";
@@ -41,19 +49,23 @@ void ConsoleUI::initializeDatabase() {
   auto deptDAO = std::make_shared<DepartmentDAOSQLite>("hr.db");
   auto empDAO = std::make_shared<EmployeeDAOSQLite>("hr.db");
   auto userDAO = std::make_shared<UserDAOSQLite>("hr.db");
+  auto attDAO = std::make_shared<AttendanceDAOSQLite>("hr.db");
 
   deptDAO->createTable();
   empDAO->createTable();
   userDAO->createTable();
+  attDAO->createTable();
 }
 
-void ConsoleUI::hrMenu(AuthService& authSvc, EmployeeService& empSvc, DepartmentService& deptSvc) {
+void ConsoleUI::hrMenu(AuthService& authSvc, EmployeeService& empSvc, DepartmentService& deptSvc,
+                       AttendanceService& attSvc) {
   int choice;
   do {
     std::cout << "\n--- HR Management ---\n";
     std::cout << "1. Manage Departments\n";
     std::cout << "2. Manage Employees\n";
-    std::cout << "3. Back to Main Menu\n";
+    std::cout << "3. Manage Attendance\n";
+    std::cout << "4. Back to Main Menu\n";
     std::cout << "Enter choice: ";
     std::cin >> choice;
 
@@ -65,6 +77,9 @@ void ConsoleUI::hrMenu(AuthService& authSvc, EmployeeService& empSvc, Department
         manageEmployees(authSvc, empSvc, deptSvc);
         break;
       case 3:
+        manageAttendance(empSvc, attSvc);
+        break;
+      case 4:
         return;
       default:
         std::cout << "Invalid choice.\n";
@@ -229,6 +244,198 @@ void ConsoleUI::deleteEmployee(EmployeeService& empSvc) {
     std::cout << "Employee deleted successfully.\n";
   } else {
     std::cout << "Failed to delete employee.\n";
+  }
+}
+
+void ConsoleUI::manageAttendance(EmployeeService& empSvc, AttendanceService& attSvc) {
+  int choice;
+  do {
+    std::cout << "\n--- Attendance Management ---\n";
+    std::cout << "1. View Attendance by Date Range\n";
+    std::cout << "2. Mark Absent\n";
+    std::cout << "3. View Attendance Reports\n";
+    std::cout << "4. Back\n";
+    std::cout << "Enter choice: ";
+    std::cin >> choice;
+
+    switch (choice) {
+      case 1:
+        viewAttendanceByDateRange(empSvc, attSvc);
+        break;
+      case 2:
+        markAbsent(attSvc, empSvc);
+        break;
+      case 3:
+        viewAttendanceReports(attSvc, empSvc);
+        break;
+      case 4:
+        return;
+      default:
+        std::cout << "Invalid choice.\n";
+    }
+  } while (true);
+}
+
+void ConsoleUI::viewAttendanceReports(AttendanceService& attSvc, EmployeeService& empSvc) {
+  auto records = attSvc.getAllAttendance();
+  if (records.empty()) {
+    std::cout << "No attendance records found.\n";
+    return;
+  }
+  std::cout << "\n=== Attendance Report ===\n";
+  std::cout << std::setw(5) << "ID" << std::setw(10) << "Emp ID" << std::setw(12) << "Date"
+            << std::setw(10) << "In" << std::setw(10) << "Out" << std::setw(10) << "Status\n";
+  std::cout << std::string(60, '-') << "\n";
+  for (const auto& att : records) {
+    std::cout << std::setw(5) << att.id << std::setw(10) << att.employeeId << std::setw(12)
+              << att.date << std::setw(10) << (att.clockIn.empty() ? "N/A" : att.clockIn)
+              << std::setw(10) << (att.clockOut.empty() ? "N/A" : att.clockOut) << std::setw(10)
+              << att.status << "\n";
+  }
+}
+
+void ConsoleUI::viewAttendanceByDateRange(EmployeeService& empSvc, AttendanceService& attSvc) {
+  int employeeId;
+  std::cout << "Enter Employee ID to filter (0 for all): ";
+  std::cin >> employeeId;
+
+  std::string startDate, endDate;
+  std::cout << "Start date (YYYY-MM-DD): ";
+  std::cin >> startDate;
+  std::cout << "End date (YYYY-MM-DD): ";
+  std::cin >> endDate;
+
+  std::vector<Attendance> attendances;
+  if (employeeId > 0) {
+    Employee emp = empSvc.getEmployee(employeeId);
+    if (emp.id == -1) {
+      std::cout << "Employee not found.\n";
+      return;
+    }
+    attendances = attSvc.getAttendanceByEmployeeAndRange(employeeId, startDate, endDate);
+  } else {
+    attendances = attSvc.getAttendanceByRange(startDate, endDate);
+  }
+
+  if (attendances.empty()) {
+    std::cout << "No attendance records found for the selected range.\n";
+    return;
+  }
+
+  std::cout << "\nID    EmpID  Date       Clock In   Clock Out  Status\n";
+  std::cout << std::string(55, '-') << "\n";
+  for (const auto& att : attendances) {
+    std::cout << std::setw(5) << att.id << std::setw(8) << att.employeeId << std::setw(12)
+              << att.date << std::setw(11) << att.clockIn << std::setw(11) << att.clockOut
+              << std::setw(10) << att.status << "\n";
+  }
+}
+
+void ConsoleUI::markAbsent(AttendanceService& attSvc, EmployeeService& empSvc) {
+  int employeeId;
+  std::cout << "Enter Employee ID to mark absent: ";
+  std::cin >> employeeId;
+  Employee emp = empSvc.getEmployee(employeeId);
+  if (emp.id == -1) {
+    std::cout << "Employee not found.\n";
+    return;
+  }
+
+  std::string date;
+  std::cout << "Date (YYYY-MM-DD): ";
+  std::cin >> date;
+
+  if (attSvc.markAbsent(employeeId, date)) {
+    std::cout << "Attendance marked as Absent for " << emp.getFullName() << " on " << date << ".\n";
+  } else {
+    std::cout << "Failed to mark attendance as Absent.\n";
+  }
+}
+
+static std::string getCurrentDate() {
+  std::time_t now = std::time(nullptr);
+  std::tm localTime = *std::localtime(&now);
+  std::ostringstream oss;
+  oss << std::put_time(&localTime, "%Y-%m-%d");
+  return oss.str();
+}
+
+static std::string getCurrentTime() {
+  std::time_t now = std::time(nullptr);
+  std::tm localTime = *std::localtime(&now);
+  std::ostringstream oss;
+  oss << std::put_time(&localTime, "%H:%M:%S");
+  return oss.str();
+}
+
+void ConsoleUI::employeeMenu(AuthService& authSvc, AttendanceService& attSvc,
+                             AuthService::LoginResult loginResult) {
+  int choice;
+  if (loginResult.employeeId == -1) {
+    std::cout << "Employee record not found.\n";
+    return;
+  }
+
+  do {
+    std::cout << "\n--- Employee Menu ---\n";
+    std::cout << "1. Clock In\n";
+    std::cout << "2. Clock Out\n";
+    std::cout << "3. View My Attendance\n";
+    std::cout << "4. Logout\n";
+    std::cout << "Enter choice: ";
+    std::cin >> choice;
+
+    switch (choice) {
+      case 1:
+        clockIn(attSvc, loginResult.employeeId);
+        break;
+      case 2:
+        clockOut(attSvc, loginResult.employeeId);
+        break;
+      case 3:
+        viewMyAttendance(attSvc, loginResult.employeeId);
+        break;
+      case 4:
+        return;
+      default:
+        std::cout << "Invalid choice.\n";
+    }
+  } while (true);
+}
+
+void ConsoleUI::clockIn(AttendanceService& attSvc, int employeeId) {
+  std::string date = getCurrentDate();
+  std::string time = getCurrentTime();
+  if (attSvc.clockIn(employeeId, date, time)) {
+    std::cout << "Clocked in successfully at " << time << " on " << date << ".\n";
+  } else {
+    std::cout << "Clock-in failed. You may have already clocked in today or there is no employee "
+                 "record.\n";
+  }
+}
+
+void ConsoleUI::clockOut(AttendanceService& attSvc, int employeeId) {
+  std::string date = getCurrentDate();
+  std::string time = getCurrentTime();
+  if (attSvc.clockOut(employeeId, date, time)) {
+    std::cout << "Clocked out successfully at " << time << " on " << date << ".\n";
+  } else {
+    std::cout << "Clock-out failed. Ensure you have clocked in and are not clocking out twice.\n";
+  }
+}
+
+void ConsoleUI::viewMyAttendance(AttendanceService& attSvc, int employeeId) {
+  auto attendances = attSvc.getEmployeeAttendance(employeeId);
+  if (attendances.empty()) {
+    std::cout << "No attendance records found.\n";
+    return;
+  }
+
+  std::cout << "\nDate       Clock In   Clock Out  Status\n";
+  std::cout << std::string(45, '-') << "\n";
+  for (const auto& att : attendances) {
+    std::cout << std::setw(11) << att.date << std::setw(11) << att.clockIn << std::setw(11)
+              << att.clockOut << std::setw(10) << att.status << "\n";
   }
 }
 
