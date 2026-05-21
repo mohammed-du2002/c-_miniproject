@@ -21,7 +21,9 @@ add_executable(
   dao/EmployeeDAOSQLite.cpp
   service/AuthService.cpp
   service/DepartmentService.cpp
-  service/EmployeeService.cpp)
+  service/EmployeeService.cpp
+  dao/AttendanceDAOSQLite.cpp
+  service/AttendanceService.cpp)
 
 # Project include directories
 target_include_directories(
